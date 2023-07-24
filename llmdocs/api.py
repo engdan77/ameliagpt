@@ -7,6 +7,8 @@ import uvicorn
 from pydantic import BaseModel
 from .tunnel import create_tunnel
 from .llm import MyLLM
+from pywebio.platform.fastapi import asgi_app
+from .web import conversation
 
 my_llm = None
 app = FastAPI(docs_url='/api',
@@ -44,8 +46,9 @@ async def startup_event():
 
 def start(src_docs: Path, port=8000):
     loop = asyncio.get_event_loop()
-    config = uvicorn.Config(app, host="0.0.0.0", port=port)
-    server = uvicorn.Server(config)
     global my_llm
     my_llm = MyLLM(docs_sources=src_docs)
+    app.mount("/conversation", asgi_app(conversation))
+    config = uvicorn.Config(app, host="0.0.0.0", port=port)
+    server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
