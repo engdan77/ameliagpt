@@ -3,6 +3,7 @@ from loguru import logger
 from fastapi import FastAPI
 import uvicorn
 from pydantic import BaseModel
+from tunnel import create_tunnel
 
 from llm import MyLLM
 
@@ -27,10 +28,15 @@ def read_item(q: Question):
     return {"question": q.question, "response": response}
 
 
-def start():
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(create_tunnel())
+
+
+def start(port=8000):
     loop = asyncio.get_event_loop()
 
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000)
+    config = uvicorn.Config(app, host="0.0.0.0", port=port)
     server = uvicorn.Server(config)
 
     loop.run_until_complete(server.serve())

@@ -7,7 +7,7 @@ faiss-cpu==1.7.4
 fastapi
 uvloop
 loguru
-
+ngrok
 
 # langchain==0.0.184
 # PyPDF2==3.0.1
