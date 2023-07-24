@@ -1,14 +1,15 @@
 import asyncio
+from pathlib import Path
+
 from loguru import logger
 from fastapi import FastAPI
 import uvicorn
 from pydantic import BaseModel
-from tunnel import create_tunnel
+from .tunnel import create_tunnel
+from .llm import MyLLM
 
-from llm import MyLLM
-
-app = FastAPI()
-my_llm = MyLLM()
+my_llm = None
+app = FastAPI(docs_url='/api')
 
 
 class Question(BaseModel):
@@ -33,10 +34,10 @@ async def startup_event():
     asyncio.create_task(create_tunnel())
 
 
-def start(port=8000):
+def start(src_docs: Path, port=8000):
     loop = asyncio.get_event_loop()
-
     config = uvicorn.Config(app, host="0.0.0.0", port=port)
     server = uvicorn.Server(config)
-
+    global my_llm
+    my_llm = MyLLM(docs_sources=src_docs)
     loop.run_until_complete(server.serve())

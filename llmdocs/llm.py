@@ -1,6 +1,4 @@
 from pathlib import Path
-
-import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
@@ -12,21 +10,23 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.llms import HuggingFaceHub
 from loguru import logger
 
+
 class MyLLM:
-    def __init__(self):
+    def __init__(self, docs_sources: Path):
         load_dotenv()
-        pdf_docs = [Path('/Users/edo/git/my/llm_docs/docs/neato.pdf')]
-        raw_text = self.get_pdf_text(pdf_docs)
+        raw_text = self.get_pdf_text(docs_sources)
         text_chunks = self.get_text_chunks(raw_text)
         vectorstore = self.get_vectorstore(text_chunks)
         self.conversation = self.get_conversation_chain(vectorstore)
 
     @staticmethod
-    def get_pdf_text(pdf_docs: list[Path]):
+    def get_pdf_text(src_path: Path):
         text = ""
-        for pdf in pdf_docs:
-            logger.info(f'Processing {pdf.as_posix()}')
-            pdf_reader = PdfReader(pdf.as_posix())
+        if not src_path.is_dir():
+            raise RuntimeError(f'Docs dir {src_path.as_posix()} needs to be a directory')
+        for file in src_path.rglob('*.pdf'):
+            logger.info(f'Processing {file.as_posix()}')
+            pdf_reader = PdfReader(file.as_posix())
             for page in pdf_reader.pages:
                 text += page.extract_text()
         return text
