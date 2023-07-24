@@ -9,7 +9,15 @@ from .tunnel import create_tunnel
 from .llm import MyLLM
 
 my_llm = None
-app = FastAPI(docs_url='/api')
+app = FastAPI(docs_url='/api',
+              title="AmeliaGPT",
+              description='A service supply answers chained with documents',
+              version="0.0.1",
+              contact={
+                  "name": "Daniel Engvall",
+                  "email": "daniel.engvall@ipsoft.com",
+              },
+              )
 
 
 class Question(BaseModel):
