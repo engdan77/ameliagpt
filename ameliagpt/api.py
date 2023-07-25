@@ -34,7 +34,7 @@ def read_root():
 @app.post("/ask")
 def read_item(q: Question):
     logger.info(f'Ask API: {q}')
-    llm = shared_obj
+    llm = shared_obj.llm
     response = llm.ask(q.question)
     logger.info(f'Respnse API: {response}')
     return {"question": q.question, "response": response}
