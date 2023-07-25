@@ -6,7 +6,7 @@ docs_sources = []
 
 class Settings:
     def __init__(self):
-        self.file = Path(appdirs.user_data_dir('llmdocs')) / 'config.txt'
+        self.file = Path(appdirs.user_data_dir('ameliagpt')) / 'config.txt'
 
     def read(self) -> str:
         if self.file.exists():

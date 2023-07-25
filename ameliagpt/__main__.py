@@ -6,6 +6,7 @@ from .api import start
 
 app = typer.Typer()
 
+logger.add("ameliagpt.log", rotation="10 MB")
 
 @app.command("start")
 def start_server(
