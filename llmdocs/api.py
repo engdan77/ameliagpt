@@ -9,8 +9,8 @@ from .tunnel import create_tunnel
 from .llm import MyLLM
 from pywebio.platform.fastapi import asgi_app
 from .web import conversation
+from .shared import shared_obj
 
-my_llm = None
 app = FastAPI(docs_url='/api',
               title="AmeliaGPT",
               description='A service supply answers chained with documents',
@@ -33,9 +33,10 @@ def read_root():
 
 @app.post("/ask")
 def read_item(q: Question):
-    logger.info(f'{q=}')
-    response = my_llm.ask(q.question)
-    logger.info(f'{response=}')
+    logger.info(f'Ask API: {q}')
+    llm = shared_obj
+    response = llm.ask(q.question)
+    logger.info(f'Respnse API: {response}')
     return {"question": q.question, "response": response}
 
 
@@ -46,8 +47,8 @@ async def startup_event():
 
 def start(src_docs: Path, port=8000):
     loop = asyncio.get_event_loop()
-    global my_llm
     my_llm = MyLLM(docs_sources=src_docs)
+    shared_obj.llm = my_llm
     app.mount("/conversation", asgi_app(conversation))
     config = uvicorn.Config(app, host="0.0.0.0", port=port)
     server = uvicorn.Server(config)

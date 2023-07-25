@@ -9,6 +9,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
 from langchain.llms import HuggingFaceHub
 from loguru import logger
+from .shared import shared_obj
 
 
 class MyLLM:
@@ -20,15 +21,17 @@ class MyLLM:
         self.conversation = self.get_conversation_chain(vectorstore)
 
     @staticmethod
-    def get_pdf_text(src_path: Path):
+    def get_pdf_text(src_path: Path, extensions=('pdf',)):
         text = ""
         if not src_path.is_dir():
             raise RuntimeError(f'Docs dir {src_path.as_posix()} needs to be a directory')
-        for file in src_path.rglob('*.pdf'):
-            logger.info(f'Processing {file.as_posix()}')
-            pdf_reader = PdfReader(file.as_posix())
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+        for ext in extensions:
+            for file in src_path.rglob(f'*.{ext}'):
+                logger.info(f'Processing {file.as_posix()}')
+                pdf_reader = PdfReader(file.as_posix())
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
+                shared_obj.loaded_docs.append(file.name)
         return text
 
     @staticmethod
@@ -64,6 +67,8 @@ class MyLLM:
         return conversation_chain
 
     def ask(self, question: str):
+        logger.info(f'Asking question: {question}')
         response = self.conversation({'question': question})
         answer = response['answer']
+        logger.info(f'Got answer: {answer}')
         return answer
