@@ -5,6 +5,8 @@ from loguru import logger
 from fastapi import FastAPI
 import uvicorn
 from pydantic import BaseModel
+
+from .textutils import get_filename
 from .tunnel import create_tunnel
 from .llm import MyLLM
 from pywebio.platform.fastapi import asgi_app
@@ -28,7 +30,7 @@ class Question(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return "Nothing here"
 
 
 @app.post("/ask")
@@ -36,8 +38,8 @@ def read_item(q: Question):
     logger.info(f'Ask API: {q}')
     llm = shared_obj.llm
     response = llm.ask(q.question)
-    logger.info(f'Respnse API: {response}')
-    return {"question": q.question, "response": response}
+    logger.info(f'Response API: {response}')
+    return {"question": q.question, "answer": response['answer'], "sources": get_filename(response['sources'])}
 
 
 @app.on_event("startup")
@@ -47,7 +49,7 @@ async def startup_event():
 
 def start(src_docs: Path, port=8000):
     loop = asyncio.get_event_loop()
-    my_llm = MyLLM(docs_sources=src_docs)
+    my_llm = MyLLM(src_docs)
     shared_obj.llm = my_llm
     app.mount("/conversation", asgi_app(conversation))
     config = uvicorn.Config(app, host="0.0.0.0", port=port)

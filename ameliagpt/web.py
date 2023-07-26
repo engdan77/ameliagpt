@@ -2,6 +2,7 @@ from pywebio.output import put_table, put_loading, put_text, put_markdown
 from pywebio.input import input
 from .shared import shared_obj
 from ameliagpt import __version__
+from .textutils import get_filename
 
 
 def conversation():
@@ -16,5 +17,5 @@ def conversation():
             response = llm.ask(question)
         put_table([
             ['Q:', question],
-            ['A:', llm.ask(question)]
-        ])
+            ['A:', [put_markdown(f'Sources being from **{get_filename(response["sources"])}**  \n\n\n{response["answer"]}')]
+             ]])
