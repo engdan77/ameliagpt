@@ -17,5 +17,5 @@ def conversation():
             response = llm.ask(question)
         put_table([
             ['Q:', question],
-            ['A:', [put_markdown(f'Sources being from **{get_filename(response["sources"])}**  \n\n\n{response["answer"]}')]
-             ]])
+            ['A:', put_markdown(f'Sources being from **{get_filename(response["sources"])}**  \n\n\n{response["answer"]}')]
+        ])
