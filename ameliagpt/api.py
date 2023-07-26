@@ -12,11 +12,12 @@ from .llm import MyLLM
 from pywebio.platform.fastapi import asgi_app
 from .web import conversation
 from .shared import shared_obj
+from ameliagpt import __version__
 
 app = FastAPI(docs_url='/api',
               title="AmeliaGPT",
+              version=__version__,
               description='A service supply answers chained with documents',
-              version="0.0.1",
               contact={
                   "name": "Daniel Engvall",
                   "email": "daniel.engvall@ipsoft.com",
