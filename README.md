@@ -34,10 +34,10 @@ $ python3 -m ameliagpt
 
 ## How to use
 
-### Local API docs
+#### Local API docs
 http://127.0.0.1:8000/api
 
-### Conversation tester
+#### Conversation tester
 http://127.0.0.1:8000/conversation/
 
 
