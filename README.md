@@ -26,9 +26,9 @@ NGROK_AUTHTOKEN=xxx
 
 
 ## Run
-
+This would use all documents found in docs, in the future there might be external API's etc.
 ````shell
-$ python3 -m ameliagpt
+$ python3 -m ameliagpt ./docs
 ````
 
 
