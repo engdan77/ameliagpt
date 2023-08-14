@@ -59,7 +59,7 @@ class MyLLM:
         return soup.get_text()
 
     @staticmethod
-    def get_txt_content(self, input_file: Path) -> str:
+    def get_txt_content(input_file: Path) -> str:
         return input_file.read_text()
 
     def get_texts_including_sources_by_path(self, source_path: Path, records_processed_files: list[str] = []) -> tuple[list, list]:
