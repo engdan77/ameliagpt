@@ -1,5 +1,8 @@
 import pickle
+import subprocess
 from pathlib import Path
+
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain import VectorDBQAWithSourcesChain
@@ -21,7 +24,9 @@ class MyLLM:
         self.vector_store = None
         self.docs_source_path = docs_source_path
         self.docs_sources = []
-        self.source_processors = {'pdf': self.get_pdf_content}
+        self.source_processors = {'pdf': self.get_pdf_content,
+                                  'doc': self.get_doc_content,
+                                  'txt': self.get_txt_content}
         self.fn_index = 'docs.index'
         self.fn_vector_store = 'vector.pkl'
         self.create_vector_store(docs_source_path)
@@ -43,6 +48,19 @@ class MyLLM:
         for page in pdf_reader.pages:
             text += page.extract_text()
         return text
+
+    @staticmethod
+    def get_doc_content(input_file: Path) -> str:
+        fn = input_file.as_posix()
+        cmd = 'textutil -stdout -strip -cat txt'.split()
+        cmd.append(fn)
+        result = subprocess.run(cmd, capture_output=True)
+        soup = BeautifulSoup(result.stdout, 'html.parser')
+        return soup.get_text()
+
+    @staticmethod
+    def get_txt_content(self, input_file: Path) -> str:
+        return input_file.read_text()
 
     def get_texts_including_sources_by_path(self, source_path: Path, records_processed_files: list[str] = []) -> tuple[list, list]:
         """Build a list of all text, while also tracking the source of each text chunk."""
