@@ -1,5 +1,6 @@
 import pickle
 import subprocess
+from collections import Counter
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -29,17 +30,28 @@ class MyLLM:
                                   'txt': self.get_txt_content}
         self.fn_index = 'docs.index'
         self.fn_vector_store = 'vector.pkl'
-        self.create_vector_store(docs_source_path)
-        self.llm = self.get_openai_llm()
-        self.qa_chain = self.get_faiss_qa_chain(self.vector_store, self.llm)
+        self.qa_chain = None
 
-    def create_vector_store(self, docs_source_path: Path):
+    def run(self):
+        vector_store = self.create_vector_store(self.docs_source_path)
+        llm = self.get_openai_llm()
+        self.qa_chain = self.get_faiss_qa_chain(vector_store, llm)
+
+    def count_tokens(self) -> Counter:
+        data, sources = self.get_texts_including_sources_by_path(self.docs_source_path)
+        token_count = Counter()
+        for i, doc in enumerate(data):
+            token_count[sources[i].stem] = len(doc.split())
+        return token_count
+
+    def create_vector_store(self, docs_source_path: Path) -> FAISS | object:
         data, sources = self.get_texts_including_sources_by_path(docs_source_path, records_processed_files=shared_obj.loaded_docs)
         docs, metadatas = self.get_chunks_including_metadata(data, sources)
         self.remove_over_sized_chunks_inline(docs, metadatas)
         store = self.get_faiss_vectorstore(docs, metadatas)
         self.store_faiss_vectorstore(store)
-        self.load_vectorstore()
+        store = self.load_vectorstore()
+        return store
 
     @staticmethod
     def get_pdf_content(input_file: Path) -> str:
@@ -114,7 +126,7 @@ class MyLLM:
         with open(self.fn_vector_store, "rb") as f:
             store: object = pickle.load(f)
         store.index = index
-        self.vector_store = store
+        return store
 
     @staticmethod
     def get_openai_llm(model_name="gpt-3.5-turbo", temperature=0.7, max_tokens=1000) -> OpenAI:

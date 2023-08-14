@@ -51,6 +51,7 @@ async def startup_event():
 def start(src_docs: Path, port=8000):
     loop = asyncio.get_event_loop()
     my_llm = MyLLM(src_docs)
+    my_llm.run()
     shared_obj.llm = my_llm
     app.mount("/conversation", asgi_app(conversation))
     config = uvicorn.Config(app, host="0.0.0.0", port=port)
