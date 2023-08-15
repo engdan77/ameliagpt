@@ -7,6 +7,7 @@ from .api import start
 import rich.table
 import rich.console
 from humanize import number
+from ameliagpt import __version__
 
 app = typer.Typer()
 
@@ -17,8 +18,7 @@ def start_server(
         name: str = typer.Argument('llm', help='Name of database'),
         port: int = typer.Option(8000, help="Server port"),
 ):
-    logger.info(f"Starting {__name__}")
-    logger.info(f"Set docs path to {docs_path.as_posix()}")
+    logger.info(f"Starting {__name__} {__version__}")
     start(name=name, port=port)
 
 
