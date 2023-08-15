@@ -50,8 +50,9 @@ def add_documents(
         name: str = typer.Option('llm', help='Name of database')):
     my_llm = MyLLM(name=name)
     data, sources = my_llm.get_docs_by_path(docs_path)
-    store = my_llm.get_vector_store()
-    store = my_llm.append_data_to_vector_store(store, data=data, metadatas=sources)
+    # store = my_llm.get_vector_store()
+    logger.info('Adding word embeddings')
+    store = my_llm.append_data_to_vector_store(data=data, metadatas=sources)
     my_llm.store_faiss_vectorstore(store)
 
 

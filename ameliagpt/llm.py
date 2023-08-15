@@ -1,6 +1,7 @@
 import pickle
 import subprocess
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain import VectorDBQAWithSourcesChain
+from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
 from langchain.vectorstores import FAISS
@@ -66,14 +68,25 @@ class MyLLM:
     def get_vector_store(self) -> FAISS | object:
         if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
             logger.info(f'Loading {self.fn_vector_store} and {self.fn_index} as DB')
+            store = self.load_vectorstore()
         else:
             logger.info(f'Creating new vector DB')
             store = self.create_faiss_vectorstore([], [])
             self.store_faiss_vectorstore(store)
-        store = self.load_vectorstore()
         return store
 
-    def append_data_to_vector_store(self, vector_store: FAISS, data: list, metadatas: list, rate_limit_tpm=300_000) -> FAISS | object:
+    def append_data_to_vector_store(self, data: list, metadatas: list, vector_store: FAISS | None = None, chunk_size=20) -> FAISS | object:
+        """This apparently not working so might be removed"""
+        if vector_store:
+            store = vector_store
+            store.from_texts(data, OpenAIEmbeddings(chunk_size=chunk_size), metadatas=metadatas)  # TODO: this does not seem to work
+        else:
+            store = FAISS.from_texts(data, OpenAIEmbeddings(chunk_size=chunk_size), metadatas=metadatas)
+        self.vector_store = store
+        return store
+
+    def append_data_to_vector_store_throttled(self, vector_store: FAISS, data: list, metadatas: list, rate_limit_tpm=300_000) -> FAISS | object:
+        """This apparently not working so might be removed"""
         store = vector_store
         tokens_per_chunk = len(data[0].split())
         calls_per_minute = rate_limit_tpm / tokens_per_chunk
@@ -83,7 +96,8 @@ class MyLLM:
         for i, (doc, metadata) in enumerate(zip(data, metadatas)):
             with limiter.ratelimit('add_to_vector', delay=True):
                 logger.info(f'Adding vector for chunk {i}/{tot_chunks} {i/tot_chunks:.1f}%')
-                store.add_texts([doc], metadatas=[metadata])
+                # store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
+                store.from_texts([doc], OpenAIEmbeddings(), metadatas=[metadata])
         self.vector_store = store
         return store
 
@@ -127,7 +141,7 @@ class MyLLM:
     @staticmethod
     def get_chunks_including_metadata(data: list, sources: list, chunk_size=1000) -> tuple[list, list]:
         """Split the text into character chunks and generate metadata"""
-        text_splitter = CharacterTextSplitter(chunk_size=chunk_size, separator="\n")
+        text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=50, separator="\n")
         docs = []
         metadatas = []
         for i, d in enumerate(data):
@@ -141,19 +155,33 @@ class MyLLM:
         """Remove oversized chunks, could be noise inline"""
         bad_docs = [i for i, d in enumerate(docs) if len(d) > chunk_size + 100]
         for i in sorted(bad_docs, reverse=True):
-            logger.debug('Deleting doc due to size', f'size:{len(docs[i])} doc: {docs[i]}')
+            logger.debug('Discarding chunk due to size:{len(docs[i])} doc-index: {docs[i]}')
+            logger.debug(f'Data such as {docs[i][:40]}...{docs[i][-40:]}')
             del docs[i]
             del metadatas[i]
         return docs, metadatas
 
     def create_faiss_vectorstore(self, docs: list, metadatas: list) -> FAISS:
         """Create a vector store"""
-        store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
+        if docs:
+            store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
+        else:
+            f = tempfile.NamedTemporaryFile('w', prefix="tmp_", delete=False)
+            f.write('foo')
+            f.close()
+            loader = TextLoader(f.name)
+            documents = loader.load()
+            text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)  # TODO: How the heck to create an empty FAISS..?
+            docs = text_splitter.split_documents(documents)
+            store = FAISS.from_documents(docs, OpenAIEmbeddings())
         self.vector_store = store
         return store
 
     def store_faiss_vectorstore(self, store: FAISS):
-        faiss.write_index(store.index, self.fn_index)
+        try:
+            faiss.write_index(store.index, self.fn_index)
+        except AttributeError as e:
+            logger.warning(e)
         store.index = None
         with open(self.fn_vector_store, "wb") as f:
             pickle.dump(store, f)
