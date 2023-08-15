@@ -51,7 +51,8 @@ def add_documents(
     my_llm = MyLLM(name=name)
     data, sources = my_llm.get_docs_by_path(docs_path)
     store = my_llm.get_vector_store()
-    my_llm.append_data_to_vector_store(store, data=data, metadatas=sources)
+    store = my_llm.append_data_to_vector_store(store, data=data, metadatas=sources)
+    my_llm.store_faiss_vectorstore(store)
 
 
 if __name__ == "__main__":
