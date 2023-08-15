@@ -1,5 +1,6 @@
 import pickle
 import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -17,10 +18,17 @@ from langchain.llms import HuggingFaceHub
 from loguru import logger
 from .shared import shared_obj
 from langchain import OpenAI
+import time
+from pyrate_limiter import Limiter, Duration, RequestRate
+
+
+def limited(until):
+    duration = int(round(until - time.time()))
+    logger.info('Rate limited, sleeping for {:d} seconds'.format(duration))
 
 
 class MyLLM:
-    def __init__(self, docs_source_path: Path, name: str = 'llm'):
+    def __init__(self, docs_source_path: Path | None = None, name: str = 'llm'):
         load_dotenv()
         self.vector_store = None
         self.docs_source_path = docs_source_path
@@ -33,9 +41,11 @@ class MyLLM:
         self.qa_chain = None
 
     def run(self):
-        vector_store = self.create_vector_store(self.docs_source_path)
+        store = self.get_vector_store(self.docs_source_path)
+        data, sources = self.get_docs_by_path(self.docs_source_path)
+        store = self.append_data_to_vector_store(vector_store=store, data=data, metadatas=sources)
         llm = self.get_openai_llm()
-        self.qa_chain = self.get_faiss_qa_chain(vector_store, llm)
+        self.qa_chain = self.get_faiss_qa_chain(store, llm)
 
     def count_tokens(self) -> Counter:
         data, sources = self.get_texts_including_sources_by_path(self.docs_source_path)
@@ -44,18 +54,39 @@ class MyLLM:
             token_count[sources[i].stem] = len(doc.split())
         return token_count
 
-    def create_vector_store(self, docs_source_path: Path) -> FAISS | object:
+    def get_docs_by_path(self, docs_source_path: Path) -> tuple[list, list]:
         data, sources = self.get_texts_including_sources_by_path(docs_source_path, records_processed_files=shared_obj.loaded_docs)
-        docs, metadatas = self.get_chunks_including_metadata(data, sources)
-        self.remove_over_sized_chunks_inline(docs, metadatas)
+        data, sources = self.get_chunks_including_metadata(data, sources)
+        data, sources = self.remove_over_sized_chunks_inline(data, sources)
+        return data, sources
+
+    def get_vector_store(self) -> FAISS | object:
+        # data, sources = self.get_docs_by_path(docs_source_path)
         if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
             logger.info(f'Loading {self.fn_vector_store} and {self.fn_index} as DB')
         else:
             logger.info(f'Creating new vector DB')
-            store = self.get_faiss_vectorstore(docs, metadatas)
+            store = self.create_faiss_vectorstore([], [])
+            # store = self.append_data_to_vector_store(vector_store=store, data=data, metadatas=sources)
+            # store = self.create_faiss_vectorstore(docs, metadatas)
             self.store_faiss_vectorstore(store)
         store = self.load_vectorstore()
         return store
+
+    def append_data_to_vector_store(self, vector_store: FAISS, data: list, metadatas: list, rate_limit_tpm=300_000) -> FAISS | object:
+        store = vector_store
+        tokens_per_chunk = len(data[0].split())
+        calls_per_minute = rate_limit_tpm / tokens_per_chunk
+        tot_chunks = len(data)
+        rate = RequestRate(calls_per_minute, Duration.MINUTE)
+        limiter = Limiter(rate)
+        for i, (doc, metadata) in enumerate(zip(data, metadatas)):
+            with limiter.ratelimit('add_to_vector', delay=True):
+                logger.info(f'Adding vector for chunk {i}/{tot_chunks} {i/tot_chunks:.1f}%')
+                store.add_texts([doc], metadatas=[metadata])
+        self.vector_store = store
+        return store
+
 
     @staticmethod
     def get_pdf_content(input_file: Path) -> str:
@@ -68,6 +99,8 @@ class MyLLM:
     @staticmethod
     def get_doc_content(input_file: Path) -> str:
         fn = input_file.as_posix()
+        if sys.platform != 'darwin':
+            logger.warning(f'Converting DOC {input_file.name} currently only supported on macOS')
         cmd = 'textutil -stdout -strip -cat txt'.split()
         cmd.append(fn)
         result = subprocess.run(cmd, capture_output=True)
@@ -104,15 +137,16 @@ class MyLLM:
         return docs, metadatas
 
     @staticmethod
-    def remove_over_sized_chunks_inline(docs: list, metadatas: list, chunk_size=1000) -> None:
+    def remove_over_sized_chunks_inline(docs: list, metadatas: list, chunk_size=1000) -> tuple[list, list]:
         """Remove oversized chunks, could be noise inline"""
         bad_docs = [i for i, d in enumerate(docs) if len(d) > chunk_size + 100]
         for i in sorted(bad_docs, reverse=True):
             logger.debug('Deleting doc due to size', f'size:{len(docs[i])} doc: {docs[i]}')
             del docs[i]
             del metadatas[i]
+        return docs, metadatas
 
-    def get_faiss_vectorstore(self, docs: list, metadatas: list) -> FAISS:
+    def create_faiss_vectorstore(self, docs: list, metadatas: list) -> FAISS:
         """Create a vector store"""
         store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
         self.vector_store = store
@@ -124,7 +158,7 @@ class MyLLM:
         with open(self.fn_vector_store, "wb") as f:
             pickle.dump(store, f)
 
-    def load_vectorstore(self):
+    def load_vectorstore(self) -> FAISS:
         """Load the FAISS index from disk."""
         index = faiss.read_index(self.fn_index)
         with open(self.fn_vector_store, "rb") as f:

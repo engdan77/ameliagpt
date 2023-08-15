@@ -44,5 +44,15 @@ def count_tokens(docs_path: Path = typer.Argument(..., resolve_path=True, help="
     logger.info(f'Cost using text-embedding-ada-002: ${tot * 0.0001:.2f}')
 
 
+@app.command()
+def add_documents(
+    docs_path: Path = typer.Argument(..., resolve_path=True, help="Path to docs to be used with LLM"),
+        name: str = typer.Option('llm', help='Name of database')):
+    my_llm = MyLLM(name=name)
+    data, sources = my_llm.get_docs_by_path(docs_path)
+    store = my_llm.get_vector_store()
+    my_llm.append_data_to_vector_store(store, data=data, metadatas=sources)
+
+
 if __name__ == "__main__":
     app()
