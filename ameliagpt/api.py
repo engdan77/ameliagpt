@@ -13,7 +13,6 @@ from .llm import MyLLM
 from pywebio.platform.fastapi import asgi_app
 from .web import conversation
 from .shared import shared_obj
-from uvicorn_loguru_integration import run_uvicorn_loguru
 import logging
 from ameliagpt import __version__
 
