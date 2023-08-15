@@ -30,10 +30,10 @@ def limited(until):
 
 
 class MyLLM:
-    def __init__(self, docs_source_path: Path | None = None, name: str = 'llm'):
+    def __init__(self, name: str = 'llm'):
         load_dotenv()
         self.vector_store = None
-        self.docs_source_path = docs_source_path
+        self.docs_source_path = None
         self.docs_sources = []
         self.source_processors = {'pdf': self.get_pdf_content,
                                   'doc': self.get_doc_content,
@@ -52,8 +52,8 @@ class MyLLM:
             return []
         return list(set([_.metadata['source'].name for _ in self.vector_store.docstore._dict.values()]))
 
-    def count_tokens(self) -> Counter:
-        data, sources = self.get_texts_including_sources_by_path(self.docs_source_path)
+    def count_tokens(self, docs_path: Path) -> Counter:
+        data, sources = self.get_texts_including_sources_by_path(docs_path)
         token_count = Counter()
         for i, doc in enumerate(data):
             token_count[sources[i].stem] = len(doc.split())

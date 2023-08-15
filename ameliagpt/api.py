@@ -50,9 +50,9 @@ async def startup_event():
     asyncio.create_task(create_tunnel())
 
 
-def start(src_docs: Path, name='llm', port=8000):
+def start(name='llm', port=8000):
     loop = asyncio.get_event_loop()
-    my_llm = MyLLM(src_docs, name=name)
+    my_llm = MyLLM(name=name)
     my_llm.run()
     shared_obj.llm = my_llm
     app.mount("/conversation", asgi_app(conversation))

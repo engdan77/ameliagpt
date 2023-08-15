@@ -14,21 +14,18 @@ logger.add("ameliagpt.log", rotation="100 MB")
 
 @app.command("start")
 def start_server(
-    docs_path: Path = typer.Argument(
-        ..., resolve_path=True, help="Path to docs to be used with LLM"
-    ),
-        name: str = typer.Option('llm', help='Name of database'),
+        name: str = typer.Argument('llm', help='Name of database'),
         port: int = typer.Option(8000, help="Server port"),
 ):
     logger.info(f"Starting {__name__}")
     logger.info(f"Set docs path to {docs_path.as_posix()}")
-    start(docs_path, name=name, port=port)
+    start(name=name, port=port)
 
 
 @app.command()
 def count_tokens(docs_path: Path = typer.Argument(..., resolve_path=True, help="Path to docs to be used with LLM")):
-    my_llm = MyLLM(docs_path)
-    token_count = my_llm.count_tokens()
+    my_llm = MyLLM()
+    token_count = my_llm.count_tokens(docs_path)
     t = rich.table.Table()
     t.add_column('Document')
     t.add_column('Count')
