@@ -41,11 +41,14 @@ class MyLLM:
         self.qa_chain = None
 
     def run(self):
-        store = self.get_vector_store(self.docs_source_path)
-        data, sources = self.get_docs_by_path(self.docs_source_path)
-        store = self.append_data_to_vector_store(vector_store=store, data=data, metadatas=sources)
+        self.vector_store = self.get_vector_store()
         llm = self.get_openai_llm()
-        self.qa_chain = self.get_faiss_qa_chain(store, llm)
+        self.qa_chain = self.get_faiss_qa_chain(self.vector_store, llm)
+
+    def get_current_docs_loaded(self) -> list:
+        if not self.vector_store:
+            return []
+        return list(set([_.metadata['source'].name for _ in self.vector_store.docstore._dict.values()]))
 
     def count_tokens(self) -> Counter:
         data, sources = self.get_texts_including_sources_by_path(self.docs_source_path)
@@ -61,14 +64,11 @@ class MyLLM:
         return data, sources
 
     def get_vector_store(self) -> FAISS | object:
-        # data, sources = self.get_docs_by_path(docs_source_path)
         if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
             logger.info(f'Loading {self.fn_vector_store} and {self.fn_index} as DB')
         else:
             logger.info(f'Creating new vector DB')
             store = self.create_faiss_vectorstore([], [])
-            # store = self.append_data_to_vector_store(vector_store=store, data=data, metadatas=sources)
-            # store = self.create_faiss_vectorstore(docs, metadatas)
             self.store_faiss_vectorstore(store)
         store = self.load_vectorstore()
         return store

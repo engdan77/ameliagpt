@@ -10,7 +10,7 @@ from humanize import number
 
 app = typer.Typer()
 
-logger.add("ameliagpt.log", rotation="10 MB")
+logger.add("ameliagpt.log", rotation="100 MB")
 
 @app.command("start")
 def start_server(

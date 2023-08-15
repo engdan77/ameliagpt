@@ -4,6 +4,7 @@ from pathlib import Path
 from loguru import logger
 from fastapi import FastAPI
 import uvicorn
+from loguru_logging_intercept import setup_loguru_logging_intercept
 from pydantic import BaseModel
 
 from .textutils import get_filename
@@ -12,6 +13,8 @@ from .llm import MyLLM
 from pywebio.platform.fastapi import asgi_app
 from .web import conversation
 from .shared import shared_obj
+from uvicorn_loguru_integration import run_uvicorn_loguru
+import logging
 from ameliagpt import __version__
 
 app = FastAPI(docs_url='/api',
@@ -56,4 +59,8 @@ def start(src_docs: Path, name='llm', port=8000):
     app.mount("/conversation", asgi_app(conversation))
     config = uvicorn.Config(app, host="0.0.0.0", port=port)
     server = uvicorn.Server(config)
+    setup_loguru_logging_intercept(
+        level=logging.DEBUG,
+        modules=("uvicorn.error", "uvicorn.asgi", "uvicorn.access")
+    )
     loop.run_until_complete(server.serve())

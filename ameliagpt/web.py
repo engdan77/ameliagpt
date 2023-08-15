@@ -8,7 +8,7 @@ from .textutils import get_filename
 def conversation():
     put_markdown(f'# AmeliaGPT {__version__} Test interface')
     put_text(f'Currently loaded documents')
-    for doc in shared_obj.loaded_docs:
+    for doc in shared_obj.llm.get_current_docs_loaded():
         put_text(doc)
     while True:
         llm = shared_obj.llm
