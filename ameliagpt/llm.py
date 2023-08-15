@@ -20,7 +20,7 @@ from langchain import OpenAI
 
 
 class MyLLM:
-    def __init__(self, docs_source_path: Path):
+    def __init__(self, docs_source_path: Path, name: str = 'llm'):
         load_dotenv()
         self.vector_store = None
         self.docs_source_path = docs_source_path
@@ -28,8 +28,8 @@ class MyLLM:
         self.source_processors = {'pdf': self.get_pdf_content,
                                   'doc': self.get_doc_content,
                                   'txt': self.get_txt_content}
-        self.fn_index = 'docs.index'
-        self.fn_vector_store = 'vector.pkl'
+        self.fn_index = f'{name}.index'
+        self.fn_vector_store = f'{name}.pkl'
         self.qa_chain = None
 
     def run(self):
@@ -48,8 +48,12 @@ class MyLLM:
         data, sources = self.get_texts_including_sources_by_path(docs_source_path, records_processed_files=shared_obj.loaded_docs)
         docs, metadatas = self.get_chunks_including_metadata(data, sources)
         self.remove_over_sized_chunks_inline(docs, metadatas)
-        store = self.get_faiss_vectorstore(docs, metadatas)
-        self.store_faiss_vectorstore(store)
+        if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
+            logger.info(f'Loading {self.fn_vector_store} and {self.fn_index} as DB')
+        else:
+            logger.info(f'Creating new vector DB')
+            store = self.get_faiss_vectorstore(docs, metadatas)
+            self.store_faiss_vectorstore(store)
         store = self.load_vectorstore()
         return store
 

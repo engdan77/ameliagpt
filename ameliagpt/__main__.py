@@ -17,11 +17,12 @@ def start_server(
     docs_path: Path = typer.Argument(
         ..., resolve_path=True, help="Path to docs to be used with LLM"
     ),
-    port: int = typer.Option(8000, help="Server port"),
+        name: str = typer.Option('llm', help='Name of database'),
+        port: int = typer.Option(8000, help="Server port"),
 ):
     logger.info(f"Starting {__name__}")
     logger.info(f"Set docs path to {docs_path.as_posix()}")
-    start(docs_path, port=port)
+    start(docs_path, name=name, port=port)
 
 
 @app.command()
