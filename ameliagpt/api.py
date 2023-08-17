@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from .textutils import get_filename
 from .tunnel import create_tunnel
-from .llm import MyLLM
+from .llm import MyLLM, AbstractEngineFactory
 from pywebio.platform.fastapi import asgi_app
 from .web import conversation
 from .shared import shared_obj
@@ -50,9 +50,9 @@ async def startup_event():
     asyncio.create_task(create_tunnel())
 
 
-def start(name='llm', port=8000):
+def start(name='llm', port=8000, engine: AbstractEngineFactory | None = None):
     loop = asyncio.get_event_loop()
-    my_llm = MyLLM(name=name)
+    my_llm = MyLLM(name=name, engine=engine)
     my_llm.run()
     shared_obj.llm = my_llm
     app.mount("/conversation", asgi_app(conversation))

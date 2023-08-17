@@ -1,4 +1,5 @@
 from ameliagpt.llm import MyLLM
+from ameliagpt.textutils import get_subclass_by_name
 from . import settings
 from pathlib import Path
 from loguru import logger
@@ -7,19 +8,24 @@ from .api import start
 import rich.table
 import rich.console
 from humanize import number
+from .llm import AbstractEngineFactory
+from enum import StrEnum
 from ameliagpt import __version__
 
 app = typer.Typer()
+engine_names = [_.__name__ for _ in AbstractEngineFactory.__subclasses__()]
+Engine = StrEnum('Engine', {_:_ for _ in engine_names})
 
 logger.add("ameliagpt.log", rotation="100 MB")
+
 
 @app.command("start")
 def start_server(
         name: str = typer.Argument('llm', help='Name of database'),
         port: int = typer.Option(8000, help="Server port"),
-):
+        engine: Engine = typer.Option(None, help='Which LLM engine to use')):
     logger.info(f"Starting {__name__} {__version__}")
-    start(name=name, port=port)
+    start(name=name, port=port, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
 
 
 @app.command()
@@ -44,10 +50,10 @@ def count_tokens(docs_path: Path = typer.Argument(..., resolve_path=True, help="
 @app.command()
 def add_documents(
     docs_path: Path = typer.Argument(..., resolve_path=True, help="Path to docs to be used with LLM"),
-        name: str = typer.Option('llm', help='Name of database')):
-    my_llm = MyLLM(name=name)
+        name: str = typer.Option('llm', help='Name of database'),
+        engine: Engine = typer.Option(None, help='Which LLM engine to use')):
+    my_llm = MyLLM(name=name, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
     data, sources = my_llm.get_docs_by_path(docs_path)
-    # store = my_llm.get_vector_store()
     logger.info('Adding word embeddings')
     store = my_llm.append_data_to_vector_store(data=data, metadatas=sources)
     my_llm.store_faiss_vectorstore(store)

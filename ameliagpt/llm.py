@@ -1,9 +1,12 @@
+import abc
 import pickle
 import subprocess
 import sys
 import tempfile
+from abc import ABC
 from collections import Counter
 from pathlib import Path
+from typing import Type
 
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
@@ -11,17 +14,46 @@ from PyPDF2 import PdfReader
 from langchain import VectorDBQAWithSourcesChain
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 import faiss
-from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.llms import HuggingFaceHub
 from loguru import logger
 from .shared import shared_obj
 from langchain import OpenAI
 import time
 from pyrate_limiter import Limiter, Duration, RequestRate
+
+
+class AbstractEngineFactory(ABC):
+    def __int__(self):
+        self.model_object = None
+        self.embedding_object = None
+        logger.info(f'Initializing LLM engine {self.__name__}')
+
+    @abc.abstractmethod
+    def initialize(self, **kwargs):
+        """Import required modules and set properties"""
+        self.name = NotImplementedError
+        self.model_object = NotImplementedError
+        self.embedding_object = NotImplementedError
+
+
+class Gpt4AllEngine(AbstractEngineFactory):
+    def initialize(self, model='orca-mini-3b.ggmlv3.q4_0.bin'):
+        from gpt4all import GPT4All
+        from langchain.embeddings import GPT4AllEmbeddings
+        self.name = 'gpt4all'
+        self.model_object = GPT4All(model)
+        self.embedding_object = GPT4AllEmbeddings()
+
+
+class OpenAiEngine(AbstractEngineFactory):
+    def initialize(self, temperature=0.7, max_tokens=1000, model_name="gpt-3.5-turbo", chunk_size=20):
+        from langchain import OpenAI
+        from langchain.embeddings import OpenAIEmbeddings
+        self.name = 'openai'
+        self.model_object = OpenAI(temperature=temperature, max_tokens=max_tokens, model_name=model_name)
+        self.embedding_object = OpenAIEmbeddings()
 
 
 def limited(until):
@@ -30,8 +62,9 @@ def limited(until):
 
 
 class MyLLM:
-    def __init__(self, name: str = 'llm'):
+    def __init__(self, name: str = 'llm', engine: Type[AbstractEngineFactory] = OpenAiEngine):
         load_dotenv()
+        self.engine = engine()
         self.vector_store = None
         self.docs_source_path = None
         self.docs_sources = []
@@ -42,9 +75,13 @@ class MyLLM:
         self.fn_vector_store = f'{name}.pkl'
         self.qa_chain = None
 
+    def init_engine(self):
+        self.engine.initialize()
+
     def run(self):
         self.vector_store = self.get_vector_store()
-        llm = self.get_openai_llm()
+        self.init_engine()
+        llm = self.engine.model_object
         self.qa_chain = self.get_faiss_qa_chain(self.vector_store, llm)
 
     def get_current_docs_loaded(self) -> list:
@@ -71,17 +108,21 @@ class MyLLM:
             store = self.load_vectorstore()
         else:
             logger.info(f'Creating new vector DB')
-            store = self.create_faiss_vectorstore([], [])
-            self.store_faiss_vectorstore(store)
+            store = self.create_faiss_vectorstore([], [])  # TODO: should be improved
+
         return store
+
+    def save_vector_store(self):
+        self.store_faiss_vectorstore(store)
 
     def append_data_to_vector_store(self, data: list, metadatas: list, vector_store: FAISS | None = None, chunk_size=20) -> FAISS | object:
         """This apparently not working so might be removed"""
+        self.engine.initialize()
         if vector_store:
             store = vector_store
-            store.from_texts(data, OpenAIEmbeddings(chunk_size=chunk_size), metadatas=metadatas)  # TODO: this does not seem to work
+            store.from_texts(data, self.engine.embedding_object, metadatas=metadatas)  # TODO: this does not seem to work
         else:
-            store = FAISS.from_texts(data, OpenAIEmbeddings(chunk_size=chunk_size), metadatas=metadatas)
+            store = FAISS.from_texts(data, self.engine.embedding_object, metadatas=metadatas)
         self.vector_store = store
         return store
 
@@ -96,8 +137,7 @@ class MyLLM:
         for i, (doc, metadata) in enumerate(zip(data, metadatas)):
             with limiter.ratelimit('add_to_vector', delay=True):
                 logger.info(f'Adding vector for chunk {i}/{tot_chunks} {i/tot_chunks:.1f}%')
-                # store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
-                store.from_texts([doc], OpenAIEmbeddings(), metadatas=[metadata])
+                store.from_texts([doc], self.engine.embedding_object, metadatas=[metadata])
         self.vector_store = store
         return store
 
@@ -164,7 +204,7 @@ class MyLLM:
     def create_faiss_vectorstore(self, docs: list, metadatas: list) -> FAISS:
         """Create a vector store"""
         if docs:
-            store = FAISS.from_texts(docs, OpenAIEmbeddings(), metadatas=metadatas)
+            store = FAISS.from_texts(docs, self.engine.embedding_object, metadatas=metadatas)
         else:
             f = tempfile.NamedTemporaryFile('w', prefix="tmp_", delete=False)
             f.write('foo')
@@ -173,7 +213,7 @@ class MyLLM:
             documents = loader.load()
             text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)  # TODO: How the heck to create an empty FAISS..?
             docs = text_splitter.split_documents(documents)
-            store = FAISS.from_documents(docs, OpenAIEmbeddings())
+            store = FAISS.from_documents(docs, self.engine.embedding_object)
         self.vector_store = store
         return store
 
@@ -186,17 +226,13 @@ class MyLLM:
         with open(self.fn_vector_store, "wb") as f:
             pickle.dump(store, f)
 
-    def load_vectorstore(self) -> FAISS:
+    def load_vectorstore(self) -> FAISS | object:
         """Load the FAISS index from disk."""
         index = faiss.read_index(self.fn_index)
         with open(self.fn_vector_store, "rb") as f:
             store: object = pickle.load(f)
         store.index = index
         return store
-
-    @staticmethod
-    def get_openai_llm(model_name="gpt-3.5-turbo", temperature=0.7, max_tokens=1000) -> OpenAI:
-        return OpenAI(temperature=temperature, max_tokens=max_tokens, model_name=model_name)
 
     @staticmethod
     def get_faiss_qa_chain(vector_store: FAISS | None, llm: OpenAI):
