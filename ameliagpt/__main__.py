@@ -23,7 +23,7 @@ logger.add("ameliagpt.log", rotation="100 MB")
 def start_server(
         name: str = typer.Argument('llm', help='Name of database'),
         port: int = typer.Option(8000, help="Server port"),
-        engine: Engine = typer.Option(None, help='Which LLM engine to use')):
+        engine: Engine = typer.Argument(..., help='Which LLM engine to use')):
     logger.info(f"Starting {__name__} {__version__}")
     start(name=name, port=port, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
 
@@ -51,7 +51,7 @@ def count_tokens(docs_path: Path = typer.Argument(..., resolve_path=True, help="
 def add_documents(
     docs_path: Path = typer.Argument(..., resolve_path=True, help="Path to docs to be used with LLM"),
         name: str = typer.Option('llm', help='Name of database'),
-        engine: Engine = typer.Option(None, help='Which LLM engine to use')):
+        engine: Engine = typer.Argument(..., help='Which LLM engine to use')):
     my_llm = MyLLM(name=name, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
     my_llm.init_engine()
     data, sources = my_llm.get_docs_by_path(docs_path)
