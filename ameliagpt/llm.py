@@ -223,32 +223,13 @@ class MyLLM:
         return store
 
     def save_faiss_vectorstore(self, store: FAISS):
-        # try:
-        #     faiss.write_index(store.index, self.fn_index)
-        # except AttributeError as e:
-        #     logger.warning(e)
-        # store.index = None
-        # with open(self.fn_vector_store, "wb") as f:
-        #     pickle.dump(store, f)
-
-        # Path('/tmp/store.bin').write_bytes(store.serialize_to_bytes())
-        # Path('/tmp/embeddings.bin').write_bytes(pickle.dumps(self.engine.embedding_object))
         name = f'{self.name}_index'
         logger.info(f'Saving index to {name}')
         store.save_local(name)
-        # logger.info(f'Saving embeddings')
-        # Path(f'{name}/embeddings_object.pkl').write_bytes(pickle.dumps(self.engine.embedding_object))
 
     def load_vectorstore(self) -> FAISS | object:
         """Load the FAISS index from disk."""
-        # index = faiss.read_index(self.fn_index)
-        # with open(self.fn_vector_store, "rb") as f:
-        #     store: object = pickle.load(f)
-        # store.index = index
         name = f'{self.name}_index'
-        # logger.info('Loading embeddings')
-        # saved_embedding_object = pickle.loads(Path(f'{name}/embeddings_object.pkl').read_bytes())
-        # store = FAISS.load_local(name, self.engine.embedding_object)
         logger.info(f'Loading index from {name}')
         store = FAISS.load_local(name, self.engine.embedding_object)
         return store
@@ -258,7 +239,6 @@ class MyLLM:
         if not self.vector_store:
             raise RuntimeError('vector_store needs to be supplied as argument')
         """Build the question answering chain."""
-        # return VectorDBQAWithSourcesChain.from_llm(llm=llm, vectorstore=vectorstore)
         return VectorDBQAWithSourcesChain.from_chain_type(
             llm=self.engine.model_object,
             chain_type="stuff",
@@ -267,8 +247,6 @@ class MyLLM:
 
     def ask(self, question: str):
         logger.info(f'Asking question: {question}')
-        # response = self.conversation({'question': question})
-        # answer = response['answer']
         response = self.qa_chain({'question': question})
         logger.info(f'Got answer: {response}')
         return response
