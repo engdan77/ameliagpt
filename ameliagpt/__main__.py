@@ -1,6 +1,5 @@
 from ameliagpt.llm import MyLLM
 from ameliagpt.textutils import get_subclass_by_name
-from . import settings
 from pathlib import Path
 from loguru import logger
 import typer
@@ -10,6 +9,7 @@ import rich.console
 from humanize import number
 from .llm import AbstractEngineFactory
 from enum import StrEnum
+from shared import shared_obj
 from ameliagpt import __version__
 
 app = typer.Typer()
@@ -23,8 +23,11 @@ logger.add("ameliagpt.log", rotation="100 MB")
 def start_server(
         name: str = typer.Argument('llm', help='Name of database'),
         port: int = typer.Option(8000, help="Server port"),
-        engine: Engine = typer.Argument(..., help='Which LLM engine to use')):
+        engine: Engine = typer.Argument(..., help='Which LLM engine to use'),
+        tunnel_enabled: bool = typer.Option(False, help='NGROK tunnel enabled')
+):
     logger.info(f"Starting {__name__} {__version__}")
+    shared_obj.tunnel = tunnel_enabled
     start(name=name, port=port, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
 
 

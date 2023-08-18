@@ -47,7 +47,8 @@ def read_item(q: Question):
 
 @app.on_event("startup")
 async def startup_event():
-    asyncio.create_task(create_tunnel())
+    if shared_obj.tunnel:
+        asyncio.create_task(create_tunnel())
 
 
 def start(name='llm', port=8000, engine: AbstractEngineFactory | None = None):
