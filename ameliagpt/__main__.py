@@ -53,10 +53,11 @@ def add_documents(
         name: str = typer.Option('llm', help='Name of database'),
         engine: Engine = typer.Option(None, help='Which LLM engine to use')):
     my_llm = MyLLM(name=name, engine=get_subclass_by_name(engine.value, AbstractEngineFactory))
+    my_llm.init_engine()
     data, sources = my_llm.get_docs_by_path(docs_path)
     logger.info('Adding word embeddings')
     store = my_llm.append_data_to_vector_store(data=data, metadatas=sources)
-    my_llm.store_faiss_vectorstore(store)
+    my_llm.save_faiss_vectorstore(store)
 
 
 if __name__ == "__main__":

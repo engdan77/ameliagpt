@@ -28,6 +28,7 @@ class AbstractEngineFactory(ABC):
     def __int__(self):
         self.model_object = None
         self.embedding_object = None
+        self.splitter_chunk_size = 1000
         logger.info(f'Initializing LLM engine {self.__name__}')
 
     @abc.abstractmethod
@@ -39,12 +40,14 @@ class AbstractEngineFactory(ABC):
 
 
 class Gpt4AllEngine(AbstractEngineFactory):
-    def initialize(self, model='orca-mini-3b.ggmlv3.q4_0.bin'):
-        from gpt4all import GPT4All
+    def initialize(self, model='orca-mini-3b.ggmlv3.q4_0.bin', max_tokens=1000):
+        # from gpt4all import GPT4All
         from langchain.embeddings import GPT4AllEmbeddings
+        from langchain.llms import GPT4All
         self.name = 'gpt4all'
-        self.model_object = GPT4All(model)
+        self.model_object = GPT4All(model=model, max_tokens=max_tokens)
         self.embedding_object = GPT4AllEmbeddings()
+        self.splitter_chunk_size = 200
 
 
 class OpenAiEngine(AbstractEngineFactory):
@@ -54,6 +57,7 @@ class OpenAiEngine(AbstractEngineFactory):
         self.name = 'openai'
         self.model_object = OpenAI(temperature=temperature, max_tokens=max_tokens, model_name=model_name)
         self.embedding_object = OpenAIEmbeddings()
+        self.splitter_chunk_size = 1000
 
 
 def limited(until):
@@ -64,6 +68,7 @@ def limited(until):
 class MyLLM:
     def __init__(self, name: str = 'llm', engine: Type[AbstractEngineFactory] = OpenAiEngine):
         load_dotenv()
+        self.name = name
         self.engine = engine()
         self.vector_store = None
         self.docs_source_path = None
@@ -74,15 +79,15 @@ class MyLLM:
         self.fn_index = f'{name}.index'
         self.fn_vector_store = f'{name}.pkl'
         self.qa_chain = None
+        logger.warning(f'Remember to call {self.__class__.__name__}.init_engine() before processing')
 
     def init_engine(self):
         self.engine.initialize()
 
     def run(self):
+        self.init_engine()  # Create all engine attributes before using those
         self.vector_store = self.get_vector_store()
-        self.init_engine()
-        llm = self.engine.model_object
-        self.qa_chain = self.get_faiss_qa_chain(self.vector_store, llm)
+        self.qa_chain = self.get_faiss_qa_chain()
 
     def get_current_docs_loaded(self) -> list:
         if not self.vector_store:
@@ -97,13 +102,15 @@ class MyLLM:
         return token_count
 
     def get_docs_by_path(self, docs_source_path: Path) -> tuple[list, list]:
+        chunk_size = self.engine.splitter_chunk_size
         data, sources = self.get_texts_including_sources_by_path(docs_source_path, records_processed_files=shared_obj.loaded_docs)
-        data, sources = self.get_chunks_including_metadata(data, sources)
-        data, sources = self.remove_over_sized_chunks_inline(data, sources)
+        data, sources = self.get_chunks_including_metadata(data, sources, chunk_size=chunk_size)
+        data, sources = self.remove_over_sized_chunks_inline(data, sources, chunk_size)
         return data, sources
 
     def get_vector_store(self) -> FAISS | object:
-        if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
+        # if Path(self.fn_index).exists() and Path(self.fn_vector_store).exists():
+        if Path(f'{self.name}_index').exists():
             logger.info(f'Loading {self.fn_vector_store} and {self.fn_index} as DB')
             store = self.load_vectorstore()
         else:
@@ -112,10 +119,7 @@ class MyLLM:
 
         return store
 
-    def save_vector_store(self):
-        self.store_faiss_vectorstore(store)
-
-    def append_data_to_vector_store(self, data: list, metadatas: list, vector_store: FAISS | None = None, chunk_size=20) -> FAISS | object:
+    def append_data_to_vector_store(self, data: list, metadatas: list, vector_store: FAISS | None = None) -> FAISS | object:
         """This apparently not working so might be removed"""
         self.engine.initialize()
         if vector_store:
@@ -181,6 +185,7 @@ class MyLLM:
     @staticmethod
     def get_chunks_including_metadata(data: list, sources: list, chunk_size=1000) -> tuple[list, list]:
         """Split the text into character chunks and generate metadata"""
+        logger.info(f'Splitting data based on size of {chunk_size}')
         text_splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=50, separator="\n")
         docs = []
         metadatas = []
@@ -217,33 +222,47 @@ class MyLLM:
         self.vector_store = store
         return store
 
-    def store_faiss_vectorstore(self, store: FAISS):
-        try:
-            faiss.write_index(store.index, self.fn_index)
-        except AttributeError as e:
-            logger.warning(e)
-        store.index = None
-        with open(self.fn_vector_store, "wb") as f:
-            pickle.dump(store, f)
+    def save_faiss_vectorstore(self, store: FAISS):
+        # try:
+        #     faiss.write_index(store.index, self.fn_index)
+        # except AttributeError as e:
+        #     logger.warning(e)
+        # store.index = None
+        # with open(self.fn_vector_store, "wb") as f:
+        #     pickle.dump(store, f)
+
+        # Path('/tmp/store.bin').write_bytes(store.serialize_to_bytes())
+        # Path('/tmp/embeddings.bin').write_bytes(pickle.dumps(self.engine.embedding_object))
+        name = f'{self.name}_index'
+        logger.info(f'Saving index to {name}')
+        store.save_local(name)
+        # logger.info(f'Saving embeddings')
+        # Path(f'{name}/embeddings_object.pkl').write_bytes(pickle.dumps(self.engine.embedding_object))
 
     def load_vectorstore(self) -> FAISS | object:
         """Load the FAISS index from disk."""
-        index = faiss.read_index(self.fn_index)
-        with open(self.fn_vector_store, "rb") as f:
-            store: object = pickle.load(f)
-        store.index = index
+        # index = faiss.read_index(self.fn_index)
+        # with open(self.fn_vector_store, "rb") as f:
+        #     store: object = pickle.load(f)
+        # store.index = index
+        name = f'{self.name}_index'
+        # logger.info('Loading embeddings')
+        # saved_embedding_object = pickle.loads(Path(f'{name}/embeddings_object.pkl').read_bytes())
+        # store = FAISS.load_local(name, self.engine.embedding_object)
+        logger.info(f'Loading index from {name}')
+        store = FAISS.load_local(name, self.engine.embedding_object)
         return store
 
-    @staticmethod
-    def get_faiss_qa_chain(vector_store: FAISS | None, llm: OpenAI):
-        if not vector_store:
+
+    def get_faiss_qa_chain(self):
+        if not self.vector_store:
             raise RuntimeError('vector_store needs to be supplied as argument')
         """Build the question answering chain."""
         # return VectorDBQAWithSourcesChain.from_llm(llm=llm, vectorstore=vectorstore)
         return VectorDBQAWithSourcesChain.from_chain_type(
-            llm=llm,
+            llm=self.engine.model_object,
             chain_type="stuff",
-            vectorstore=vector_store
+            vectorstore=self.vector_store
         )
 
     def ask(self, question: str):
