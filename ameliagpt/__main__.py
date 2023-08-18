@@ -9,7 +9,7 @@ import rich.console
 from humanize import number
 from .llm import AbstractEngineFactory
 from enum import StrEnum
-from shared import shared_obj
+from .shared import shared_obj
 from ameliagpt import __version__
 
 app = typer.Typer()
