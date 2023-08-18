@@ -41,6 +41,14 @@ cd ../../gpt4all-bindings/python
 pip3 install -e .
 ```
 
+##### Download link to LLM model tested with GPT4All model
+https://huggingface.co/mrgaang/aira/blob/main/gpt4all-converted.bin
+Place these into `~/.cache/gpt4all/` for convenience.
+
+#### Download link to LLama embedding model used
+https://huggingface.co/Pi3141/alpaca-native-7B-ggml/commit/397e872bf4c83f4c642317a5bf65ce84a105786e
+Place these into `~/.cache/gpt4all/` for convenience.
+
 
 ## Run
 This would use all documents found in docs, in the future there might be external API's etc.
