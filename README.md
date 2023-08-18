@@ -1,7 +1,8 @@
 # AmeliaGPT
 
-More details around this project found at 
-https://dtools.ipsoft.com/confluence/display/CO/AmeliaGPT
+## Background and libraries used
+
+This was mostly a project found valuable at my job, and allow me to level up skills around LLM ([Large Language Models](https://en.wikipedia.org/wiki/Large_language_model)) and chose to look closer into the [LangChain](https://github.com/langchain-ai/langchain) framework to tie things together, and primarily using [FAISS](https://github.com/facebookresearch/faiss) for similarity search and finally got my head around using a local model using [GPT4All](https://github.com/nomic-ai/gpt4all) so with this adding another abstraction layer (facade) to easily configure different settings to test things out and also adding an API to easily integrate into other services, and another simple UI interface to allow you to do Question & Answer without any hazzle. So .. this became "AmeliaGPT" just a name that came to me .. 
 
 ## Installation
 - Install Python 3.11 or above
@@ -26,7 +27,7 @@ NGROK_AUTHTOKEN=xxx
 - https://openai.com/blog/openai-api  - if you wish to use OpenAI
 - https://ngrok.com/docs/api/resources/api-keys/  - if you wish to have support for ingress tunnel
 
-#### Give support for GPT4ALL (local LLM)
+#### Give support for GPT4ALL (local LLM) if this is preferred
 Also include following steps
 ```shell
 # Based on https://github.com/nomic-ai/gpt4all/tree/main/gpt4all-bindings/python
@@ -181,4 +182,4 @@ class MyLLM {
 
 ## Author
 
-Feel free to contact daniel.engvall@amelia.com 
+Feel free to contact daniel@engvalls.eu
