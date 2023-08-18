@@ -1,5 +1,4 @@
 import abc
-import pickle
 import subprocess
 import sys
 import tempfile
@@ -7,19 +6,15 @@ from abc import ABC
 from collections import Counter
 from pathlib import Path
 from typing import Type
-
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain import VectorDBQAWithSourcesChain
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
-import faiss
 from loguru import logger
 from .shared import shared_obj
-from langchain import OpenAI
 import time
 from pyrate_limiter import Limiter, Duration, RequestRate
 
