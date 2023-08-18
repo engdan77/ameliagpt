@@ -16,3 +16,8 @@ pydantic
 typer
 appdirs
 pywebio
+bs4
+pyrate-limiter
+loguru-logging-intercept
+rich
+humanize
